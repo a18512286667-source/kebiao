@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的课表</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f0f0f3;
+    padding: 20px 10px 40px;
+    color: #333;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 14px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .header .sub { font-size: 13px; color: #999; margin-top: 4px; }
+
+  .savebar {
+    display: flex; justify-content: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .savebar button {
+    border: none; padding: 8px 18px; border-radius: 18px;
+    font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .btn-keep { background: #6b8ef0; color: #fff; }
+  .btn-keep.saved { background: #3fb98a; }
+  .savebar button:active { transform: scale(.96); }
+
+  table {
+    width: 100%; border-collapse: separate; border-spacing: 4px;
+    table-layout: fixed;
+  }
+  th, td { text-align: center; vertical-align: middle; }
+  thead th { padding: 8px 2px; font-size: 14px; }
+  thead th .day { font-weight: 700; font-size: 15px; }
+  .time-col { width: 52px; font-size: 12px; color: #888; font-weight: 600; }
+  tbody td { height: 72px; }
+
+  .cell {
+    width: 100%; height: 100%;
+    border-radius: 8px; cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 6px 4px; transition: transform .12s;
+  }
+  .cell:active { transform: scale(.95); }
+  .cell.empty { background: #fbfbfd; border: 1.5px dashed #e3e3e8; }
+  .cell.empty .plus { color: #ccc; font-size: 20px; }
+  .cell.filled { color: #fff; font-weight: 600; }
+  .cell .name { font-size: 16px; line-height: 1.3; }
+  .cell .note { font-size: 11px; opacity: .92; margin-top: 3px; font-weight: 500; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px 16px;
+    justify-content: center; margin-top: 18px; font-size: 13px;
+  }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 14px; height: 14px; border-radius: 4px; }
+
+  .footer { text-align: center; margin-top: 22px; }
+  .footer span {
+    font-size: 12px; color: #b5b5bd; cursor: pointer;
+    border-bottom: 1px dotted #cfcfd6; padding-bottom: 1px;
+  }
+
+  .tip {
+    max-width: 520px; margin: 16px auto 0; font-size: 12px;
+    color: #999; line-height: 1.7; background: #fff;
+    border-radius: 10px; padding: 12px 16px;
+  }
+  .tip b { color: #6b8ef0; }
+
+  /* 弹窗 */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; z-index: 100;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 340px;
+    padding: 22px 20px; box-shadow: 0 10px 40px rgba(0,0,0,.2);
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 16px; text-align: center; }
+  .modal label { font-size: 13px; color: #888; display: block; margin-bottom: 5px; }
+  .modal input {
+    width: 100%; padding: 9px 11px; border: 1.5px solid #e3e3e8;
+    border-radius: 9px; font-size: 15px; font-family: inherit;
+    margin-bottom: 14px;
+  }
+  .modal input:focus { outline: none; border-color: #6b8ef0; }
+  .swatches { display: flex; gap: 9px; margin-bottom: 18px; flex-wrap: wrap; }
+  .swatch {
+    width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+    border: 3px solid transparent;
+  }
+  .swatch.sel { border-color: #333; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-btns button {
+    flex: 1; padding: 10px; border-radius: 10px; border: none;
+    font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .btn-save { background: #6b8ef0; color: #fff; }
+  .btn-del { background: #fff; color: #e8584e; border: 1.5px solid #f0d0ce; }
+  .btn-cancel { background: #f0f0f3; color: #666; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%);
+    background: rgba(0,0,0,.82); color: #fff; font-size: 13px;
+    padding: 10px 18px; border-radius: 20px; z-index: 200;
+    opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>我的课表</h1>
+    <div class="sub">点击格子编辑 · 改完记得点"保存课表"</div>
+  </div>
+
+  <div class="savebar">
+    <button class="btn-keep" id="keepBtn">保存课表</button>
+  </div>
+
+  <table>
+    <thead><tr id="headRow"></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="tip">
+    在微信里使用提示:微信浏览器有时不会自动记住修改。改完课表后,
+    点上方 <b>保存课表</b>,会把课表写进当前网址。然后点微信右上角
+    <b>···</b> → <b>收藏</b>(或转发到「文件传输助手」),
+    下次从收藏打开就是你最新的课表。
+  </div>
+
+  <div class="footer">
+    <span id="resetLink">恢复默认课表</span>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">编辑课程</h3>
+    <label>课程名称</label>
+    <input type="text" id="inName" placeholder="如:数学">
+    <label>备注(可留空)</label>
+    <input type="text" id="inNote" placeholder="如:10:30–12:30">
+    <label>颜色</label>
+    <div class="swatches" id="swatches"></div>
+    <div class="modal-btns">
+      <button class="btn-del" id="btnDel">删除</button>
+      <button class="btn-cancel" id="btnCancel">取消</button>
+      <button class="btn-save" id="btnSave">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DAYS = ['一','二','三','四','五','六','日'];
+const TIMES = ['8–10','10–12','1–3','3–5','5–7','7–9'];
+const COLORS = [
+  '#e8584e','#f0b13c','#6b8ef0','#a05cd6','#3fb98a','#4ec3d6','#9aa0ad'
+];
+
+function defaultSchedule(){
+  const s = Array.from({length:6}, ()=>Array(7).fill(null));
+  const set = (r,c,name,note,color)=>{ s[r][c] = {name,note:note||'',color}; };
+  set(0,1,'数学','','#e8584e');
+  set(0,2,'历史','','#6b8ef0');
+  set(0,4,'数学','','#e8584e');
+  set(0,5,'英语','','#f0b13c');
+  set(0,6,'英语','','#f0b13c');
+  set(1,1,'英语','','#f0b13c');
+  set(1,2,'数学','10:30–12:30','#e8584e');
+  set(1,6,'历史','10:30–12:30','#6b8ef0');
+  set(2,2,'学校','','#4ec3d6');
+  set(2,3,'英语','1–4','#f0b13c');
+  set(2,4,'历史','','#6b8ef0');
+  set(2,5,'政治','','#a05cd6');
+  set(3,4,'政治','','#a05cd6');
+  set(3,6,'政治','','#a05cd6');
+  set(4,2,'物理','','#3fb98a');
+  set(4,4,'物理','','#3fb98a');
+  set(5,0,'物理','6–8','#3fb98a');
+  set(5,4,'物理','6–8','#3fb98a');
+  return s;
+}
+
+// ---- 数据加载:优先 URL,其次本地存储,最后默认 ----
+function encodeData(s){
+  return encodeURIComponent(JSON.stringify(s));
+}
+function decodeData(str){
+  return JSON.parse(decodeURIComponent(str));
+}
+
+let schedule = null;
+// 1. 试 URL hash
+try {
+  const h = location.hash;
+  if(h && h.length > 2 && h.indexOf('d=') !== -1){
+    schedule = decodeData(h.split('d=')[1]);
+  }
+} catch(e){ schedule = null; }
+// 2. 试本地存储
+if(!schedule){
+  try {
+    const ls = localStorage.getItem('myschedule');
+    if(ls) schedule = JSON.parse(ls);
+  } catch(e){ schedule = null; }
+}
+// 3. 默认
+if(!schedule) schedule = defaultSchedule();
+
+function localSave(){
+  try { localStorage.setItem('myschedule', JSON.stringify(schedule)); } catch(e){}
+}
+
+function render(){
+  const head = document.getElementById('headRow');
+  head.innerHTML = '<th class="time-col">节次</th>';
+  DAYS.forEach(d=>{
+    const th = document.createElement('th');
+    th.innerHTML = '<span class="day">'+d+'</span>';
+    head.appendChild(th);
+  });
+  const body = document.getElementById('body');
+  body.innerHTML = '';
+  TIMES.forEach((t,r)=>{
+    const tr = document.createElement('tr');
+    const tc = document.createElement('td');
+    tc.className = 'time-col'; tc.textContent = t;
+    tr.appendChild(tc);
+    for(let c=0;c<7;c++){
+      const td = document.createElement('td');
+      const item = schedule[r][c];
+      const cell = document.createElement('div');
+      if(item){
+        cell.className = 'cell filled';
+        cell.style.background = item.color;
+        cell.innerHTML = '<span class="name">'+item.name+'</span>' +
+          (item.note ? '<span class="note">'+item.note+'</span>' : '');
+      } else {
+        cell.className = 'cell empty';
+        cell.innerHTML = '<span class="plus">+</span>';
+      }
+      cell.onclick = ()=> openModal(r,c);
+      td.appendChild(cell);
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  });
+  renderLegend();
+}
+
+function renderLegend(){
+  const names = {};
+  schedule.flat().forEach(it=>{ if(it) names[it.name] = it.color; });
+  const lg = document.getElementById('legend');
+  lg.innerHTML = '';
+  Object.entries(names).forEach(([n,c])=>{
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = '<span class="dot" style="background:'+c+'"></span>'+n;
+    lg.appendChild(d);
+  });
+}
+
+let editR=0, editC=0, pickedColor=COLORS[0];
+const modalBg = document.getElementById('modalBg');
+
+function openModal(r,c){
+  editR=r; editC=c;
+  const item = schedule[r][c];
+  document.getElementById('modalTitle').textContent = DAYS[c]+' · '+TIMES[r];
+  document.getElementById('inName').value = item ? item.name : '';
+  document.getElementById('inNote').value = item ? item.note : '';
+  pickedColor = item ? item.color : COLORS[0];
+  buildSwatches();
+  document.getElementById('btnDel').style.display = item ? '' : 'none';
+  modalBg.classList.add('show');
+  setTimeout(()=>document.getElementById('inName').focus(),100);
+}
+
+function buildSwatches(){
+  const sw = document.getElementById('swatches');
+  sw.innerHTML = '';
+  COLORS.forEach(c=>{
+    const s = document.createElement('div');
+    s.className = 'swatch' + (c===pickedColor?' sel':'');
+    s.style.background = c;
+    s.onclick = ()=>{ pickedColor = c; buildSwatches(); };
+    sw.appendChild(s);
+  });
+}
+
+function closeModal(){ modalBg.classList.remove('show'); }
+
+function markUnsaved(){
+  const b = document.getElementById('keepBtn');
+  b.classList.remove('saved');
+  b.textContent = '保存课表';
+}
+
+function doEdit(){
+  const name = document.getElementById('inName').value.trim();
+  if(!name){ schedule[editR][editC] = null; }
+  else {
+    schedule[editR][editC] = {
+      name,
+      note: document.getElementById('inNote').value.trim(),
+      color: pickedColor
+    };
+  }
+  localSave(); render(); closeModal(); markUnsaved();
+}
+document.getElementById('btnSave').onclick = doEdit;
+['inName','inNote'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{
+    if(e.key==='Enter') doEdit();
+  });
+});
+document.getElementById('btnDel').onclick = ()=>{
+  schedule[editR][editC] = null;
+  localSave(); render(); closeModal(); markUnsaved();
+};
+document.getElementById('btnCancel').onclick = closeModal;
+modalBg.onclick = (e)=>{ if(e.target===modalBg) closeModal(); };
+
+document.getElementById('resetLink').onclick = ()=>{
+  if(confirm('确定恢复成默认课表?当前修改会丢失。')){
+    schedule = defaultSchedule(); localSave(); render(); markUnsaved();
+  }
+};
+
+// 保存课表:写进 URL hash
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+document.getElementById('keepBtn').onclick = ()=>{
+  localSave();
+  location.hash = 'd=' + encodeData(schedule);
+  const b = document.getElementById('keepBtn');
+  b.classList.add('saved');
+  b.textContent = '已保存 ✓';
+  showToast('已保存到网址,可点微信右上角···收藏本页');
+};
+
+render();
+</script>
+</body>
+</html>
