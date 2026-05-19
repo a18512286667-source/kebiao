@@ -9,17 +9,16 @@
   body {
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     background: #f0f0f3;
-    padding: 20px 10px 40px;
+    padding: 20px 8px 40px;
     color: #333;
   }
-  .wrap { max-width: 760px; margin: 0 auto; }
+  .wrap { max-width: 820px; margin: 0 auto; }
   .header { text-align: center; margin-bottom: 14px; }
   .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
   .header .sub { font-size: 13px; color: #999; margin-top: 4px; }
 
   .savebar {
-    display: flex; justify-content: center; gap: 10px;
-    margin-bottom: 14px;
+    display: flex; justify-content: center; gap: 10px; margin-bottom: 14px;
   }
   .savebar button {
     border: none; padding: 8px 18px; border-radius: 18px;
@@ -35,20 +34,42 @@
     table-layout: fixed;
   }
   th, td { text-align: center; vertical-align: middle; }
-  thead th { padding: 8px 2px; font-size: 14px; }
+
+  thead th { padding: 6px 1px; }
   thead th .day { font-weight: 700; font-size: 15px; }
-  .time-col { width: 52px; font-size: 12px; color: #888; font-weight: 600; }
-  tbody td { height: 72px; }
+  thead .corner .label { font-size: 11px; color: #bbb; font-weight: 600; }
+  thead .corner { width: 78px; }
+
+  .seg-col { width: 22px; padding: 0; }
+  .seg {
+    width: 22px; height: 100%; border-radius: 6px; color: #fff;
+    font-size: 12px; font-weight: 700;
+    writing-mode: vertical-rl; letter-spacing: 2px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .seg-am { background: #f3a93c; }
+  .seg-pm { background: #5b9bd5; }
+  .seg-ev { background: #8a7fd0; }
+
+  .time-col { width: 56px; }
+  .time-card {
+    background: #f4f4f6; border-radius: 8px; padding: 8px 2px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .time-card .num { font-size: 12px; font-weight: 700; color: #666; }
+  .time-card .clock { font-size: 9px; color: #b0b0b8; margin-top: 2px; }
+
+  tbody td { height: 74px; }
 
   .cell {
     width: 100%; height: 100%;
     border-radius: 8px; cursor: pointer;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    padding: 6px 4px; transition: transform .12s;
+    padding: 6px 3px; transition: transform .12s;
   }
   .cell:active { transform: scale(.95); }
-  .cell.empty { background: #fbfbfd; border: 1.5px dashed #e3e3e8; }
+  .cell.empty { background: #fafafb; border: 1.5px dashed #e6e6ea; }
   .cell.empty .plus { color: #ccc; font-size: 20px; }
   .cell.filled { color: #fff; font-weight: 600; }
   .cell .name { font-size: 16px; line-height: 1.3; }
@@ -68,13 +89,12 @@
   }
 
   .tip {
-    max-width: 520px; margin: 16px auto 0; font-size: 12px;
+    max-width: 540px; margin: 16px auto 0; font-size: 12px;
     color: #999; line-height: 1.7; background: #fff;
     border-radius: 10px; padding: 12px 16px;
   }
   .tip b { color: #6b8ef0; }
 
-  /* 弹窗 */
   .modal-bg {
     position: fixed; inset: 0; background: rgba(0,0,0,.45);
     display: none; align-items: center; justify-content: center;
@@ -89,8 +109,7 @@
   .modal label { font-size: 13px; color: #888; display: block; margin-bottom: 5px; }
   .modal input {
     width: 100%; padding: 9px 11px; border: 1.5px solid #e3e3e8;
-    border-radius: 9px; font-size: 15px; font-family: inherit;
-    margin-bottom: 14px;
+    border-radius: 9px; font-size: 15px; font-family: inherit; margin-bottom: 14px;
   }
   .modal input:focus { outline: none; border-color: #6b8ef0; }
   .swatches { display: flex; gap: 9px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -142,9 +161,7 @@
     下次从收藏打开就是你最新的课表。
   </div>
 
-  <div class="footer">
-    <span id="resetLink">恢复默认课表</span>
-  </div>
+  <div class="footer"><span id="resetLink">恢复默认课表</span></div>
 </div>
 
 <div class="modal-bg" id="modalBg">
@@ -168,10 +185,20 @@
 
 <script>
 const DAYS = ['一','二','三','四','五','六','日'];
-const TIMES = ['8–10','10–12','1–3','3–5','5–7','7–9'];
-const COLORS = [
-  '#e8584e','#f0b13c','#6b8ef0','#a05cd6','#3fb98a','#4ec3d6','#9aa0ad'
+const ROWS = [
+  {num:'8–10',  clock:'第1·2节',   seg:'am'},
+  {num:'10–12', clock:'第3·4节',   seg:'am'},
+  {num:'1–3',   clock:'第5·6节',   seg:'pm'},
+  {num:'3–5',   clock:'第7·8节',   seg:'pm'},
+  {num:'5–7',   clock:'第9·10节',  seg:'ev'},
+  {num:'7–9',   clock:'第11·12节', seg:'ev'}
 ];
+const SEGS = {
+  am:{name:'上午', cls:'seg-am'},
+  pm:{name:'下午', cls:'seg-pm'},
+  ev:{name:'晚上', cls:'seg-ev'}
+};
+const COLORS = ['#e8584e','#f0b13c','#6b8ef0','#a05cd6','#3fb98a','#4ec3d6','#9aa0ad'];
 
 function defaultSchedule(){
   const s = Array.from({length:6}, ()=>Array(7).fill(null));
@@ -184,43 +211,31 @@ function defaultSchedule(){
   set(1,1,'英语','','#f0b13c');
   set(1,2,'数学','10:30–12:30','#e8584e');
   set(1,6,'历史','10:30–12:30','#6b8ef0');
-  set(2,2,'学校','','#4ec3d6');
+  set(2,2,'历史','学校','#6b8ef0');
   set(2,3,'英语','1–4','#f0b13c');
   set(2,4,'历史','','#6b8ef0');
   set(2,5,'政治','','#a05cd6');
   set(3,4,'政治','','#a05cd6');
   set(3,6,'政治','','#a05cd6');
-  set(4,2,'物理','','#3fb98a');
-  set(4,4,'物理','','#3fb98a');
-  set(5,0,'物理','6–8','#3fb98a');
-  set(5,4,'物理','6–8','#3fb98a');
+  set(4,2,'地理','','#3fb98a');
+  set(4,4,'地理','','#3fb98a');
+  set(5,0,'地理','6–8','#3fb98a');
+  set(5,4,'地理','6–8','#3fb98a');
   return s;
 }
 
-// ---- 数据加载:优先 URL,其次本地存储,最后默认 ----
-function encodeData(s){
-  return encodeURIComponent(JSON.stringify(s));
-}
-function decodeData(str){
-  return JSON.parse(decodeURIComponent(str));
-}
+function encodeData(s){ return encodeURIComponent(JSON.stringify(s)); }
+function decodeData(str){ return JSON.parse(decodeURIComponent(str)); }
 
 let schedule = null;
-// 1. 试 URL hash
 try {
   const h = location.hash;
-  if(h && h.length > 2 && h.indexOf('d=') !== -1){
-    schedule = decodeData(h.split('d=')[1]);
-  }
+  if(h && h.indexOf('d=') !== -1){ schedule = decodeData(h.split('d=')[1]); }
 } catch(e){ schedule = null; }
-// 2. 试本地存储
 if(!schedule){
-  try {
-    const ls = localStorage.getItem('myschedule');
-    if(ls) schedule = JSON.parse(ls);
-  } catch(e){ schedule = null; }
+  try { const ls = localStorage.getItem('myschedule'); if(ls) schedule = JSON.parse(ls); }
+  catch(e){ schedule = null; }
 }
-// 3. 默认
 if(!schedule) schedule = defaultSchedule();
 
 function localSave(){
@@ -229,7 +244,7 @@ function localSave(){
 
 function render(){
   const head = document.getElementById('headRow');
-  head.innerHTML = '<th class="time-col">节次</th>';
+  head.innerHTML = '<th class="corner" colspan="2"><span class="label">时段/节次</span></th>';
   DAYS.forEach(d=>{
     const th = document.createElement('th');
     th.innerHTML = '<span class="day">'+d+'</span>';
@@ -237,10 +252,20 @@ function render(){
   });
   const body = document.getElementById('body');
   body.innerHTML = '';
-  TIMES.forEach((t,r)=>{
+  ROWS.forEach((rowInfo,r)=>{
     const tr = document.createElement('tr');
+    if(r % 2 === 0){
+      const segTd = document.createElement('td');
+      segTd.className = 'seg-col';
+      segTd.rowSpan = 2;
+      const seg = SEGS[rowInfo.seg];
+      segTd.innerHTML = '<div class="seg '+seg.cls+'">'+seg.name+'</div>';
+      tr.appendChild(segTd);
+    }
     const tc = document.createElement('td');
-    tc.className = 'time-col'; tc.textContent = t;
+    tc.className = 'time-col';
+    tc.innerHTML = '<div class="time-card"><span class="num">'+rowInfo.num+
+      '</span><span class="clock">'+rowInfo.clock+'</span></div>';
     tr.appendChild(tc);
     for(let c=0;c<7;c++){
       const td = document.createElement('td');
@@ -283,7 +308,7 @@ const modalBg = document.getElementById('modalBg');
 function openModal(r,c){
   editR=r; editC=c;
   const item = schedule[r][c];
-  document.getElementById('modalTitle').textContent = DAYS[c]+' · '+TIMES[r];
+  document.getElementById('modalTitle').textContent = DAYS[c]+' · '+ROWS[r].num;
   document.getElementById('inName').value = item ? item.name : '';
   document.getElementById('inNote').value = item ? item.note : '';
   pickedColor = item ? item.color : COLORS[0];
@@ -344,7 +369,6 @@ document.getElementById('resetLink').onclick = ()=>{
   }
 };
 
-// 保存课表:写进 URL hash
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
