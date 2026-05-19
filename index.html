@@ -18,7 +18,7 @@
   .header h1 { font-size: 23px; font-weight: 800; letter-spacing: 1px; }
   .header .sub { font-size: 12.5px; color: #9a9aa6; margin-top: 5px; }
 
-  .savebar { display: flex; justify-content: center; margin: 14px 0; }
+  .savebar { display: flex; justify-content: center; gap: 9px; margin: 14px 0 6px; }
   .btn-keep {
     border: none; padding: 9px 26px; border-radius: 0;
     font-size: 13.5px; cursor: pointer; font-family: inherit; font-weight: 700;
@@ -28,6 +28,19 @@
   }
   .btn-keep.saved { background: #35b88a; box-shadow: 0 4px 12px rgba(53,184,138,.35); }
   .btn-keep:active { transform: scale(.96); }
+  .btn-refresh {
+    border: 1.5px solid #d4d4dc; padding: 9px 18px; border-radius: 0;
+    font-size: 13.5px; cursor: pointer; font-family: inherit; font-weight: 700;
+    background: #fff; color: #666;
+  }
+  .btn-refresh:active { transform: scale(.96); }
+  .sync-status {
+    text-align: center; font-size: 11.5px; margin-bottom: 12px;
+    color: #9a9aa6;
+  }
+  .sync-status.ok { color: #35b88a; }
+  .sync-status.err { color: #e8584e; }
+  .sync-status.loading { color: #5b7cf0; }
 
   .card {
     background: #fff; border-radius: 0; padding: 0;
@@ -187,7 +200,9 @@
 
   <div class="savebar">
     <button class="btn-keep" id="keepBtn">保存课表</button>
+    <button class="btn-refresh" id="refreshBtn">刷新</button>
   </div>
+  <div class="sync-status" id="syncStatus">正在连接云端…</div>
 
   <div class="card">
     <table>
@@ -199,10 +214,8 @@
   <div class="legend" id="legend"></div>
 
   <div class="tip">
-    在微信里使用提示:微信浏览器有时不会自动记住修改。改完课表后,
-    点上方 <b>保存课表</b>,会把课表写进当前网址。然后点微信右上角
-    <b>···</b> → <b>收藏</b>(或转发到「文件传输助手」),
-    下次从收藏打开就是你最新的课表。
+    这张课表已开启<b>云同步</b>:你或朋友改完课表后,点 <b>保存课表</b>
+    就会同步到云端;其他人打开网页或点 <b>刷新</b>,就能看到最新版本。
   </div>
 
   <div class="footer"><span id="resetLink">恢复默认课表</span></div>
@@ -268,22 +281,79 @@ function defaultSchedule(){
   return s;
 }
 
-function encodeData(s){ return encodeURIComponent(JSON.stringify(s)); }
-function decodeData(str){ return JSON.parse(decodeURIComponent(str)); }
+// ===== Supabase 云同步配置 =====
+const SB_URL = 'https://bcqctqeokcbyhmydsfom.supabase.co';
+const SB_KEY = 'sb_publishable_-KMPJ5aqyPdsByAv3xOfeA_3q28Q2NG';
+const SB_TABLE = SB_URL + '/rest/v1/schedule';
+const SB_HEAD = {
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json'
+};
 
 let schedule = null;
+// 先用本地缓存快速显示(避免白屏)
 try {
-  const h = location.hash;
-  if(h && h.indexOf('d=') !== -1){ schedule = decodeData(h.split('d=')[1]); }
+  const ls = localStorage.getItem('myschedule');
+  if(ls) schedule = JSON.parse(ls);
 } catch(e){ schedule = null; }
-if(!schedule){
-  try { const ls = localStorage.getItem('myschedule'); if(ls) schedule = JSON.parse(ls); }
-  catch(e){ schedule = null; }
-}
 if(!schedule) schedule = defaultSchedule();
 
 function localSave(){
   try { localStorage.setItem('myschedule', JSON.stringify(schedule)); } catch(e){}
+}
+
+// 同步状态显示
+function setSyncStatus(text, type){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'sync-status' + (type ? ' ' + type : '');
+}
+
+// 从云端拉取最新课表
+function cloudLoad(){
+  fetch(SB_TABLE + '?id=eq.1&select=data', { headers: SB_HEAD })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(rows => {
+      if(rows && rows.length && rows[0].data && Array.isArray(rows[0].data)
+         && rows[0].data.length === 6){
+        schedule = rows[0].data;
+        localSave();
+        render();
+        setSyncStatus('云端已同步', 'ok');
+      } else {
+        // 云端还没数据,把当前本地课表上传一次作为初始
+        cloudSave(true);
+      }
+    })
+    .catch(err => {
+      setSyncStatus('云端连接失败,当前为本地课表', 'err');
+    });
+}
+
+// 保存课表到云端
+function cloudSave(silent){
+  setSyncStatus('保存中…', 'loading');
+  fetch(SB_TABLE + '?id=eq.1', {
+    method: 'PATCH',
+    headers: Object.assign({}, SB_HEAD, {'Prefer': 'return=minimal'}),
+    body: JSON.stringify({ data: schedule, updated_at: new Date().toISOString() })
+  })
+    .then(r => {
+      if(r.ok){
+        setSyncStatus('已保存到云端 ✓', 'ok');
+        const b = document.getElementById('keepBtn');
+        if(b){ b.classList.add('saved'); b.textContent = '已保存 ✓'; }
+        if(!silent) showToast('已保存到云端,其他设备刷新即可看到');
+      } else {
+        return Promise.reject(r.status);
+      }
+    })
+    .catch(err => {
+      setSyncStatus('保存失败,请检查网络后重试', 'err');
+      if(!silent) showToast('保存失败,请检查网络后重试');
+    });
 }
 
 // 今天周几 -> 列号
@@ -472,14 +542,16 @@ function showToast(msg){
 }
 document.getElementById('keepBtn').onclick = ()=>{
   localSave();
-  location.hash = 'd=' + encodeData(schedule);
-  const b = document.getElementById('keepBtn');
-  b.classList.add('saved');
-  b.textContent = '已保存 ✓';
-  showToast('已保存到网址,可点微信右上角 ··· 收藏本页');
+  cloudSave(false);
+};
+
+document.getElementById('refreshBtn').onclick = ()=>{
+  setSyncStatus('正在刷新…', 'loading');
+  cloudLoad();
 };
 
 render();
+cloudLoad();
 </script>
 </body>
 </html>
