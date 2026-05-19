@@ -30,31 +30,36 @@
   .btn-keep:active { transform: scale(.96); }
 
   .card {
-    background: #fff; border-radius: 0; padding: 10px 8px;
+    background: #fff; border-radius: 0; padding: 0;
     box-shadow: 0 6px 22px rgba(40,40,70,.07);
+    overflow: hidden;
   }
 
   table {
-    width: 100%; border-collapse: separate; border-spacing: 3px;
+    width: 100%; border-collapse: collapse;
     table-layout: fixed;
   }
   th, td { text-align: center; vertical-align: middle; }
 
-  thead th { padding: 4px 1px 8px; }
+  /* 单元格分隔线 */
+  tbody td { border: 1px solid #ededf2; }
+  tbody tr td:first-child { border-left: none; }
+  tbody tr td:last-child { border-right: none; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  thead th { padding: 7px 1px; border-bottom: 2px solid #ededf2; }
   thead th .day { font-weight: 700; font-size: 15px; color: #44444f; }
   thead th .date { font-size: 9.5px; color: #b8b8c2; margin-top: 2px; }
-  thead th.today .day {
-    color: #fff; background: #5b7cf0; border-radius: 0;
-    padding: 3px 0; display: block;
-  }
+  thead th.today { background: #eef1fe; }
+  thead th.today .day { color: #4566e0; }
   thead th.today .date { color: #5b7cf0; font-weight: 700; }
-  thead .corner .label { font-size: 10.5px; color: #b8b8c2; font-weight: 700; }
-  thead .corner { width: 84px; }
+  thead .corner .label { font-size: 10px; color: #b8b8c2; font-weight: 700; }
+  thead .corner { width: 74px; }
 
   /* 时段竖标签 */
   .seg-col { width: 22px; padding: 0; }
   .seg {
-    width: 22px; height: 100%; border-radius: 0; color: #fff;
+    width: 22px; height: 100%; color: #fff;
     font-size: 12px; font-weight: 800; line-height: 1.3;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -64,50 +69,43 @@
   .seg-pm { background: linear-gradient(160deg,#6aa9e0,#4f8fd0); }
   .seg-ev { background: linear-gradient(160deg,#9a8fe0,#7d6fd0); }
 
-  /* 时间卡片 —— 更醒目 */
-  .time-col { width: 52px; }
+  /* 时间格 */
+  .time-col { width: 52px; padding: 0; }
   .time-card {
-    background: #f1f2f7; border-radius: 0; padding: 8px 1px;
-    display: flex; flex-direction: column; align-items: center;
-    border: 1.5px solid #e8e9f0;
+    background: #f5f5f9; width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
   }
-  .time-card.today { background: #eaeefe; border-color: #c9d4fb; }
+  .time-card.today { background: #eaeefe; }
   .time-card .num {
-    font-size: 16px; font-weight: 800; color: #3a3a44;
+    font-size: 15px; font-weight: 800; color: #3a3a44;
     letter-spacing: -.5px;
   }
   .time-card .clock {
     font-size: 9px; color: #fff; background: #b9bac6;
-    padding: 1.5px 6px; border-radius: 0; margin-top: 5px;
+    padding: 1.5px 6px; margin-top: 5px;
     font-weight: 600; white-space: nowrap;
   }
   .time-card.today .num { color: #4566e0; }
   .time-card.today .clock { background: #8aa0f0; }
 
-  tbody td { height: 84px; }
-  td.col-today { background: rgba(91,124,240,.055); border-radius: 0; }
+  tbody td { height: 86px; padding: 0; }
+  td.col-today .cell.empty { background: #f3f5fe; }
 
   .cell {
-    width: 100%; height: 100%;
-    border-radius: 0; cursor: pointer;
+    width: 100%; height: 100%; cursor: pointer;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    padding: 5px 2px; transition: transform .12s, box-shadow .12s;
+    padding: 5px 2px; transition: transform .1s;
   }
-  .cell.empty {
-    background: #f6f6f9;
-    border: 1.5px solid #eeeef3;
-  }
+  .cell.empty { background: #fff; }
   .cell.empty:active { background: #eef0f8; }
-  .cell.filled {
-    color: #fff; font-weight: 700;
-    box-shadow: 0 1px 4px rgba(0,0,0,.1);
-  }
-  .cell.filled:active { transform: scale(.95); }
+  .cell.filled { color: #fff; font-weight: 700; }
+  .cell.filled:active { transform: scale(.94); }
   .cell .name { font-size: 17px; line-height: 1.2; }
   .cell .note {
     font-size: 10.5px; opacity: .95; margin-top: 4px; font-weight: 500;
-    background: rgba(255,255,255,.22); padding: 1.5px 6px; border-radius: 0;
+    background: rgba(255,255,255,.22); padding: 1.5px 6px;
   }
 
   .legend {
@@ -329,7 +327,7 @@ function render(){
     }
     const tc = document.createElement('td');
     tc.className = 'time-col';
-    tc.innerHTML = '<div class="time-card'+(false?'':'')+'">'+
+    tc.innerHTML = '<div class="time-card">'+
       '<span class="num">'+rowInfo.num+'</span>'+
       '<span class="clock">'+rowInfo.clock+'</span></div>';
     tr.appendChild(tc);
